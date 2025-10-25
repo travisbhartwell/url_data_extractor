@@ -1,0 +1,83 @@
+#!/usr/bin/env -S mycmd myproject run
+# -*- mode: shell-script; sh-shell: bash; sh-basic-offset: 4; sh-indentation: 4; coding: utf-8 -*-
+# shellcheck shell=bash
+
+set -o nounset -o errexit -o errtrace -o pipefail
+
+# --------------------------------------------------------------------------------------------------
+# Global Dependencies
+mycmd.trace "The following variables set in main are used in the test task definition file:"
+# shellcheck disable=SC2154
+mycmd.trace "- SRC_DIRECTORY: ${SRC_DIRECTORY}"
+
+myproject.register_task_definition_file_description "Tasks for dealing with Python source files for URL Data Extractor"
+
+# --------------------------------------------------------------------------------------------------
+# Python Tasks
+function install() {
+    uv_run sync
+}
+
+myproject.register_task install
+myproject.register_task_description install "Install the Python package and dependencies."
+
+function ruff_check_fix() {
+    local -n fileset="${1}"
+
+    uv_run ruff check --fix "${fileset[@]}"
+}
+
+myproject.register_task_with_fileset lint-and-fix ruff_check_fix PYTHON_FILES
+myproject.register_task_description lint-and-fix "Lint and fix any issues in Python files with ruff."
+
+function ruff_check() {
+    local -n fileset="${1}"
+
+    uv_run ruff check "${fileset[@]}"
+}
+
+myproject.register_task_with_fileset lint ruff_check PYTHON_FILES
+myproject.register_task_description lint "Lint Python files with ruff."
+
+function black_format() {
+    local -n fileset="${1}"
+
+    uv_run black "${fileset[@]}"
+}
+
+myproject.register_task_with_fileset format black_format PYTHON_FILES
+myproject.register_task_description format "Format Python files with Black."
+
+function black_format_check() {
+    local -n fileset="${1}"
+
+    uv_run black --check "${fileset[@]}"
+}
+
+myproject.register_task_with_fileset format-check black_format_check PYTHON_FILES
+myproject.register_task_description format-check "Check Python files format with Black."
+
+function typecheck() {
+    uv_run mypy "${SRC_DIRECTORY}"
+}
+
+myproject.register_task typecheck
+myproject.register_task_description typecheck "Type Check the project with MyPy."
+
+function check_all() {
+    myproject.execute_tasks lint \; format-check \; typecheck
+}
+
+myproject.register_task check-all check_all
+myproject.register_task_description check-all "Run all lint, format, and type checks on the Python project."
+
+# --------------------------------------------------------------------------------------------------
+# Python Tasks Support Functions
+
+mycmd.add_to_init_bin_batch uv
+
+function uv_run() {
+    mycmd.bin_execute uv run "${@}"
+}
+
+mycmd.trace "Finished loading the Python task definition file."

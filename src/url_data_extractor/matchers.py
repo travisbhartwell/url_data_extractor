@@ -5,6 +5,7 @@ from urllib.parse import ParseResult
 from url_data_extractor.exceptions import InvalidBuilderStateException
 from url_data_extractor._url_utils import url_path_parts
 
+
 class URLMatcher(Protocol):
     def match_url(self, parsed_url: ParseResult) -> bool: ...
 
@@ -13,7 +14,7 @@ class URLMatcher(Protocol):
 class CompoundMatcher(URLMatcher):
     matchers: list[URLMatcher]
 
-    def match_url(self, parsed_url: URLMatcher) -> bool:
+    def match_url(self, parsed_url: ParseResult) -> bool:
         if not self.matchers:
             return False
 
@@ -49,7 +50,7 @@ class PathPartsMatcher(URLMatcher):
     values_by_index: dict[int, str]
 
     def match_url(self, parsed_url: ParseResult) -> bool:
-        parts = url_path_parts(parsed_url) 
+        parts = url_path_parts(parsed_url)
         parts_count = len(parts)
 
         if not parts_count:

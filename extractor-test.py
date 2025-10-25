@@ -9,9 +9,7 @@ gitHubIssueURLDataExtractor = (
     .with_url_matcher(
         CompoundMatcher.Builder()
         .with_matcher(HostMatcher("github.com"))
-        .with_matcher(
-            PathPartsMatcher.Builder().with_value_at_index(-2, "issues").build()
-        )
+        .with_matcher(PathPartsMatcher.Builder().with_value_at_index(-2, "issues").build())
         .build()
     )
     .with_data_element_extractor("org", PathPartDataExtractor(0))

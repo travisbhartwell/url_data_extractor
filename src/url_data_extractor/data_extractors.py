@@ -22,9 +22,7 @@ class URLDataExtractor:
 
     def extract_url_data(self, parsed_url: ParseResult) -> Optional[dict[str, str]]:
         if not self.url_matcher.match_url(parsed_url):
-            raise NonMatchingURLException(
-                f"'{parsed_url.geturl()}' is not a matching URL."
-            )
+            raise NonMatchingURLException(f"'{parsed_url.geturl()}' is not a matching URL.")
 
         return {
             element_name: element_extractor.extract_data_element(parsed_url)
@@ -34,9 +32,7 @@ class URLDataExtractor:
     @dataclass
     class Builder:
         url_matcher: Optional[URLMatcher] = None
-        element_extractors: dict[str, URLDataElementExtractor] = field(
-            default_factory=dict
-        )
+        element_extractors: dict[str, URLDataElementExtractor] = field(default_factory=dict)
 
         def with_url_matcher(self, url_matcher: URLMatcher) -> Self:
             self.url_matcher = url_matcher
@@ -69,7 +65,7 @@ class PathPartDataExtractor(URLDataElementExtractor):
     def extract_data_element(self, parsed_url: ParseResult) -> str:
         parts = url_path_parts(parsed_url)
         parts_count = len(parts)
-        
+
         index = self.path_index
         if index < 0:
             index = parts_count + index
