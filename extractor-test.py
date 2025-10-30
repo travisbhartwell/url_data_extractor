@@ -8,7 +8,7 @@ gitHubIssueURLDataExtractor = (
     URLDataExtractor.Builder()
     .with_url_matcher(
         CompoundMatcher.Builder()
-        .with_matcher(HostMatcher("github.com"))
+        .with_matcher(HostMatcher.hostname_equals_matcher("github.com"))
         .with_matcher(PathPartsMatcher.Builder().with_value_at_index(-2, "issues").build())
         .build()
     )

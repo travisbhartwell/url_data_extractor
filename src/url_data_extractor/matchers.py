@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Protocol, Self
-from urllib.parse import ParseResult
+from urllib.parse import parse_qs, ParseResult
 
 from url_data_extractor.exceptions import InvalidBuilderStateException
 from url_data_extractor._url_utils import url_path_parts
@@ -8,6 +8,10 @@ from url_data_extractor._url_utils import url_path_parts
 
 class URLMatcher(Protocol):
     def match_url(self, parsed_url: ParseResult) -> bool: ...
+
+
+class StringMatcherCallable(Protocol):
+    def __call__(self, value: str) -> bool: ...
 
 
 @dataclass(frozen=True)
@@ -39,15 +43,23 @@ class CompoundMatcher(URLMatcher):
 
 @dataclass
 class HostMatcher(URLMatcher):
-    host: str
+    string_matcher: StringMatcherCallable
 
     def match_url(self, parsed_url: ParseResult) -> bool:
-        return parsed_url.hostname == self.host
+        hostname = parsed_url.hostname
+        if hostname is None:
+            return False
+
+        return self.string_matcher(hostname)
+
+    @classmethod
+    def hostname_equals_matcher(cls, hostname: str) -> HostMatcher:
+        return HostMatcher(lambda url_hostname: hostname == url_hostname)
 
 
 @dataclass(frozen=True)
 class PathPartsMatcher(URLMatcher):
-    values_by_index: dict[int, str]
+    matchers_by_index: dict[int, StringMatcherCallable]
 
     def match_url(self, parsed_url: ParseResult) -> bool:
         parts = url_path_parts(parsed_url)
@@ -56,39 +68,52 @@ class PathPartsMatcher(URLMatcher):
         if not parts_count:
             return False
 
-        values_to_match_dict = self.get_values_to_match_dict(parts_count)
+        index_matchers = self._get_index_matchers_dict(parts_count)
 
-        for index, value in values_to_match_dict.items():
+        for index, matcher in index_matchers.items():
             if index >= parts_count:
                 return False
 
-            if parts[index] != value:
+            if not matcher(parts[index]):
                 return False
 
         return True
 
-    def get_values_to_match_dict(self, parts_count: int) -> dict[int, str]:
-        values_to_match_dict = {}
+    def _get_index_matchers_dict(self, parts_count: int) -> dict[int, StringMatcherCallable]:
+        index_matchers = {}
 
-        for index, value in self.values_by_index.items():
+        for index, matcher in self.matchers_by_index.items():
             if index < 0:
                 index = parts_count + index
-            values_to_match_dict[index] = value
+            index_matchers[index] = matcher
 
-        return values_to_match_dict
+        return index_matchers
 
     @dataclass
     class Builder:
-        values_by_index: dict[int, str] = field(default_factory=dict)
+        matchers_by_index: dict[int, StringMatcherCallable] = field(default_factory=dict)
 
-        def with_value_at_index(self, index: int, value: str) -> Self:
-            self.values_by_index[index] = value
+        def with_matcher_at_index(self, index: int, matcher: StringMatcherCallable) -> Self:
+            self.matchers_by_index[index] = matcher
             return self
 
+        def with_value_at_index(self, index: int, value: str) -> Self:
+            return self.with_matcher_at_index(index, lambda x: x == value)
+
         def build(self) -> PathPartsMatcher:
-            if not self.values_by_index:
+            if not self.matchers_by_index:
                 raise InvalidBuilderStateException(
                     "Cannot build a PathPartsMatcher instnace, no values at index matchers defined."
                 )
 
-            return PathPartsMatcher(self.values_by_index)
+            return PathPartsMatcher(self.matchers_by_index)
+
+
+@dataclass
+class URLFragmentStringMatcher(URLMatcher):
+    string_matcher: StringMatcherCallable
+
+    def match_url(self, parsed_url: ParseResult) -> bool:
+        return self.string_matcher(parsed_url.fragment)
+
+
