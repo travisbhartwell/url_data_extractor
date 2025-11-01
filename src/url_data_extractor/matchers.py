@@ -117,3 +117,39 @@ class URLFragmentStringMatcher(URLMatcher):
         return self.string_matcher(parsed_url.fragment)
 
 
+class HasQueryStringMatcher(URLMatcher):
+    """
+    Match whether or not a URL has a query string.
+    """
+
+    def match_url(self, parsed_url: ParseResult) -> bool:
+        return parsed_url.query == ""
+
+
+@dataclass
+class URLQueryStringVariableMatcher(URLMatcher):
+    """
+    Match that one or more variables exist in the URL query string.
+    """
+
+    query_variable_matchers: list[StringMatcherCallable]
+
+    def match_url(self, parsed_url: ParseResult) -> bool:
+        query: dict[str, list[str]] = parse_qs(parsed_url.query)
+        if not query:
+            return False
+
+        query_keys = set(query.keys())
+
+        for variable_value_matcher in self.query_variable_matchers:
+            if not self._find_match_for_matcher(query_keys, variable_value_matcher):
+                return False
+
+        return True
+
+    def _find_match_for_matcher(self, query_keys: set[str], matcher: StringMatcherCallable) -> bool:
+        for key in query_keys:
+            if matcher(key):
+                return True
+
+        return False

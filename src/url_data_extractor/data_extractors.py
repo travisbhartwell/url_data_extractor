@@ -4,7 +4,7 @@ from url_data_extractor.exceptions import (
     NonMatchingURLException,
 )
 from url_data_extractor.matchers import URLMatcher
-from url_data_extractor._url_utils import url_path_parts
+from url_data_extractor._url_utils import url_path_parts, url_query_dict
 
 from dataclasses import dataclass, field
 from typing import Optional, Protocol, Self
@@ -20,7 +20,7 @@ class URLDataExtractor:
     url_matcher: URLMatcher
     element_extractors: dict[str, URLDataElementExtractor]
 
-    def extract_url_data(self, parsed_url: ParseResult) -> Optional[dict[str, str]]:
+    def extract_url_data(self, parsed_url: ParseResult) -> dict[str, str]:
         if not self.url_matcher.match_url(parsed_url):
             raise NonMatchingURLException(f"'{parsed_url.geturl()}' is not a matching URL.")
 
@@ -71,6 +71,45 @@ class PathPartDataExtractor(URLDataElementExtractor):
             index = parts_count + index
 
         if index >= parts_count:
-            raise DataElementNotFoundException("Attempting to retrieve path part out of bounds.")
+            raise DataElementNotFoundException(f"Path part index {index} is out of bounds.")
 
         return parts[index]
+
+
+@dataclass
+class PathSliceDataExtractor(URLDataElementExtractor):
+    start_index: int
+    end_index: Optional[int] = None
+
+    def extract_data_element(self, parsed_url: ParseResult) -> str:
+        parts = url_path_parts(parsed_url)
+        parts_count = len(parts)
+
+        if abs(self.start_index) >= parts_count:
+            raise DataElementNotFoundException(
+                "Path part start index {self.start_index} is out of bounds."
+            )
+
+        if not self.end_index:
+            result_parts = parts[self.start_index :]
+        elif abs(self.end_index) >= parts_count:
+            raise DataElementNotFoundException(
+                "Path part end index {self.end_index} is out of bounds."
+            )
+        else:
+            result_parts = parts[self.start_index : self.end_index]
+
+        return "/".join(result_parts)
+
+
+@dataclass
+class QueryVariableValueDataExtractor(URLDataElementExtractor):
+    variable: str
+
+    def extract_data_element(self, parsed_url: ParseResult) -> str:
+        query_dict = url_query_dict(parsed_url)
+
+        if self.variable not in query_dict:
+            raise DataElementNotFoundException(f"Query variable '{self.variable}' not found.")
+
+        return query_dict[self.variable]
